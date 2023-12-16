@@ -26,19 +26,27 @@ RedSharpNano can be integrated into your project in two ways:
 
 To run the demo project or execute the tests, you need .Net 8 SDK installed and a local Redis server, you can use Docker to run a Redis instance.
 
-- This command pulls the latest Redis image and runs it in a detached mode with the default Redis port (6379) mapped to your local machine.
+- Pull the latest Redis image and runs it in a detached mode with the default Redis port (6379) mapped to your local machine.
 
 ```bash
 docker run -d --name redis-stack-server -p 6379:6379 redis/redis-stack-server:latest
 ```
 
-- To run the demo project use your IDE or execute the following command
+- Clone the repo
+
+```bash
+git clone https://github.com/janek-lopez/RedSharpNano.git
+
+cd RedSharpNano
+```
+
+- Run the demo project
 
 ```bash
 dotnet run --project .\src\RedSharpNano.Demo\
 ```
 
-- To run the tests use your IDE or execute the following command
+- Run the tests
 
 ```bash
 dotnet test
