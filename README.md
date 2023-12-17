@@ -2,7 +2,7 @@
 
 ## Introduction
 
-RedSharpNano is a minimalistic Redis client for the RESP2 protocol, showcasing that a fully functional Redis client can be achieved in approximately 100 lines of code C# code. It's designed to emphasize simplicity, not best practices or optimal implementations.
+RedSharpNano is a minimalistic Redis client for the RESP2 protocol, showcasing that a fully functional Redis client can be achieved in approximately 100 lines of C# code. It's designed to emphasize simplicity, not best practices or optimal implementations.
 
 ## Features
 
