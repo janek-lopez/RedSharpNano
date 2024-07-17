@@ -1,113 +1,93 @@
 ﻿using System.Net.Sockets;
-using System.Text.RegularExpressions;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace RedSharpNano;
 
 public class Resp2Client : IDisposable
 {
-    private TcpClient _tcpClient;
-    private NetworkStream _stream;
-    private StreamReader _reader;
-    private List<string> _pipelineCommandBuffer = new List<string>();
-    private bool _isPipelineActive = false;
-    private bool _disposed = false;
+    private readonly TcpClient _tcp;
+    private readonly NetworkStream _stream;
+    private readonly StreamReader _reader;
+    private readonly List<string> _pipeline = new();
+    private bool _isPipelining;
 
-    public Resp2Client(string server = "localhost", int port = 6379)
+    public Resp2Client(string host = "localhost", int port = 6379)
     {
-        _tcpClient = new TcpClient(server, port);
-        _stream = _tcpClient.GetStream();
-        _reader = new StreamReader(_tcpClient.GetStream(), Encoding.UTF8);
+        _tcp = new TcpClient(host, port);
+        _stream = _tcp.GetStream();
+        _reader = new StreamReader(_stream, Encoding.UTF8);
     }
 
-    public List<object> Pipeline(Action<Resp2Client> pipelineActions)
+    public async Task<object> CallAsync(params string[] args)
     {
-        _pipelineCommandBuffer.Clear();
-        _isPipelineActive = true;
-        pipelineActions(this);
-        return ExecutePipeline();
-    }
-    
-    private List<object> ExecutePipeline()
-    {
-        var pipelinedCommand = string.Join("", _pipelineCommandBuffer);
-        _stream.Write(Encoding.UTF8.GetBytes(pipelinedCommand), 0, pipelinedCommand.Length);
-        var responses = new List<object>();
-
-        for (int i = 0; i < _pipelineCommandBuffer.Count; i++)
-            responses.Add(ParseResponse());
-
-        _isPipelineActive = false;
-        _pipelineCommandBuffer.Clear();
-        return responses;
+        var cmd = $"*{args.Length}\r\n{string.Join("", args.Select(a => $"${a.Length}\r\n{a}\r\n"))}";
+        if (_isPipelining) { _pipeline.Add(cmd); return null; }
+        await _stream.WriteAsync(Encoding.UTF8.GetBytes(cmd));
+        return await ParseResponseAsync();
     }
 
-    public object Call(string arg)
+    public async Task<object> CallAsync(string arg)
     {
         var args = Regex
             .Matches(arg, @"(?<match>\w+)|\""(?<match>[\w\s]*)""")
             .Select(m => m.Groups["match"].Value)
             .ToArray(); //https://stackoverflow.com/questions/554013/regular-expression-to-split-on-spaces-unless-in-quotes
 
-        return Call(args[0], args[1..]);
+        return await CallAsync(args);
     }
 
-    public object Call(string method, params string[] args)
+    public async Task<List<object>> PipelineAsync(Func<Resp2Client, Task> actions)
     {
-        var cmd = PrepareCommand(method, args);
-
-        if (!_isPipelineActive)
+        _isPipelining = true;
+        await actions(this);
+        await _stream.WriteAsync(Encoding.UTF8.GetBytes(string.Join("", _pipeline)));
+        var responses = new List<object>();
+        foreach (var _ in _pipeline)
         {
-            _tcpClient.GetStream().Write(Encoding.UTF8.GetBytes(cmd), 0, cmd.Length);
-            return ParseResponse();
+            responses.Add(await ParseResponseAsync());
         }
-
-        _pipelineCommandBuffer.Add(cmd);
-        return null;
+        _pipeline.Clear();
+        _isPipelining = false;
+        return responses;
     }
 
-    private string PrepareCommand(string method, params string[] args)
+    private async Task<object> ParseResponseAsync()
     {
-        var sb = new StringBuilder().Append($"*{args.Length + 1}\r\n${method.Length}\r\n{method}\r\n");
-
-        foreach (var arg in args)
-            sb.Append($"${arg.Length}\r\n{arg}\r\n");
-
-        return sb.ToString();
-    }
-
-    private object ParseResponse()
-    {
-        var line = _reader.ReadLine();
-
-        if (line == null)
-            throw new InvalidOperationException("No response from server.");
-
-        var type = line[0];
-        var result = line[1..];
-
-        switch (type)
+        var line = await _reader.ReadLineAsync();
+        if (string.IsNullOrEmpty(line)) throw new Exception("Empty response");
+        return line[0] switch
         {
-            case '-': throw new Exception(result);
-            case '$':
-                if (result == "-1") return null;
-                var length = int.Parse(result);
-                var buffer = new char[length];
-                _reader.ReadBlock(buffer, 0, length);
-                _reader.ReadLine();
-                return new string(buffer);
-            case '*': return Enumerable.Range(0, int.Parse(result)).Select(_ => ParseResponse()).ToArray();
-            default: return result;
+            '-' => throw new Exception(line[1..]),
+            '$' => await ReadBulkString(int.Parse(line[1..])),
+            '*' => await ReadArray(int.Parse(line[1..])),
+            _ => line[1..]
+        };
+    }
+
+    private async Task<string> ReadBulkString(int length)
+    {
+        if (length == -1) return null;
+        var buffer = new char[length];
+        await _reader.ReadBlockAsync(buffer, 0, length);
+        await _reader.ReadLineAsync(); // Consume CRLF
+        return new string(buffer);
+    }
+
+    private async Task<object[]> ReadArray(int length)
+    {
+        var result = new object[length];
+        for (int i = 0; i < length; i++)
+        {
+            result[i] = await ParseResponseAsync();
         }
+        return result;
     }
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _tcpClient?.Dispose();
+        _tcp?.Dispose();
         _stream?.Dispose();
         _reader?.Dispose();
-        _disposed = true;
-        GC.SuppressFinalize(this);
     }
 }

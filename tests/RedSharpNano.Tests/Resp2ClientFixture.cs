@@ -2,24 +2,22 @@ using Xunit;
 
 namespace RedSharpNano.Tests;
 
-public class Resp2ClientFixture : IDisposable
+public class Resp2ClientFixture : IAsyncLifetime
 {
     //Global setup
-    public Resp2ClientFixture()
+    public async Task InitializeAsync()
     {
         using var client = new Resp2Client();
-        client.Call("FLUSHALL");
+        await client.CallAsync("FLUSHALL");
     }
 
     //Global TearDown
-    public void Dispose()
+    public async Task DisposeAsync()
     {
         using var client = new Resp2Client();
-        client.Call("FLUSHALL");
+        await client.CallAsync("FLUSHALL");
     }
 }
 
 [CollectionDefinition("Redis collection")]
-public class DatabaseCollection : ICollectionFixture<Resp2ClientFixture>
-{
-}
+public class DatabaseCollection : ICollectionFixture<Resp2ClientFixture>;

@@ -1,191 +1,200 @@
 ﻿using Xunit;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
-namespace RedSharpNano.Tests;
-
-[Collection("Redis collection")]
-public class RedSharpNanoListTests : RedSharpNanoBaseTests
+namespace RedSharpNano.Tests
 {
-    [Fact]
-    public void Should_AddToListAndRetrieveAll_When_ListOperationsPerformed()
+    [Collection("Redis collection")]
+    public class RedSharpNanoListTests : RedSharpNanoBaseTests
     {
-        var storeMembers = new List<string> { "one", "two", "three" };
-        storeMembers.ForEach(member => Client.Call("RPUSH", ElementId, member));
-
-        var listCount = Convert.ToInt32(Client.Call("LLEN", ElementId));
-        Assert.Equal(storeMembers.Count, listCount);
-
-        var members = Enumerable.Range(0, listCount)
-            .Select(index => Client.Call("LINDEX", ElementId, index.ToString()))
-            .ToList();
-
-        Assert.Equal(storeMembers, members);
-    }
-
-    [Fact]
-    public void Should_ReturnListCount_When_ElementsAddedToList()
-    {
-        Client.Call("RPUSH", ElementId, "one");
-        Client.Call("RPUSH", ElementId, "two");
-
-        var listCount = Convert.ToInt32(Client.Call("LLEN", ElementId));
-        Assert.Equal(2, listCount);
-    }
-
-    [Fact]
-    public void Should_AddElementsToList_When_RPushCommandIsUsed()
-    {
-        Client.Call("RPUSH", ElementId, "one");
-        Client.Call("RPUSH", ElementId, "two");
-        var result = (object[])Client.Call("LRANGE", ElementId, "0", "-1");
-
-        Assert.True(Enumerable.SequenceEqual(new object[] { "one", "two" }, result));
-    }
-
-    [Fact]
-    public void Should_ReturnCorrectItem_When_GettingItemFromList()
-    {
-        Client.Call("RPUSH", ElementId, "one");
-        Client.Call("RPUSH", ElementId, "two");
-        Client.Call("RPUSH", ElementId, "three");
-
-        var item = Client.Call("LINDEX", ElementId, "1");
-        Assert.Equal("two", item);
-    }
-
-    [Fact]
-    public void Should_SetNewItem_When_UsingLSetCommand()
-    {
-        Client.Call("RPUSH", ElementId, "one");
-        Client.Call("RPUSH", ElementId, "two");
-        Client.Call("LSET", ElementId, "1", "new");
-
-        var item = Client.Call("LINDEX", ElementId, "1");
-        Assert.Equal("new", item);
-    }
-
-    [Fact]
-    public void Should_RemoveAndReturnFirstItem_When_UsingLPopCommand()
-    {
-        Client.Call("RPUSH", ElementId, "one");
-        Client.Call("RPUSH", ElementId, "two");
-        Client.Call("RPUSH", ElementId, "three");
-
-        var poppedItem = Client.Call("LPOP", ElementId);
-        Assert.Equal("one", poppedItem);
-
-        var listCount = Convert.ToInt32(Client.Call("LLEN", ElementId));
-        Assert.Equal(2, listCount);
-    }
-
-    [Fact]
-    public void Should_RemoveAndReturnLastItem_When_UsingRPopCommand()
-    {
-        Client.Call("RPUSH", ElementId, "one");
-        Client.Call("RPUSH", ElementId, "two");
-        Client.Call("RPUSH", ElementId, "three");
-
-        var poppedItem = Client.Call("RPOP", ElementId);
-        Assert.Equal("three", poppedItem);
-
-        var listCount = Convert.ToInt32(Client.Call("LLEN", ElementId));
-        Assert.Equal(2, listCount);
-    }
-
-    [Fact]
-    public void Should_AddItemToLeft_When_UsingLPushCommand()
-    {
-        Client.Call("LPUSH", ElementId, "one");
-        Client.Call("LPUSH", ElementId, "zero");
-
-        var firstItem = Client.Call("LINDEX", ElementId, "0");
-        Assert.Equal("zero", firstItem);
-    }
-
-    [Fact]
-    public void Should_TrimList_When_UsingLTrimCommand()
-    {
-        for (int i = 0; i < 5; i++)
+        [Fact]
+        public async Task Should_AddToListAndRetrieveAll_When_ListOperationsPerformed()
         {
-            Client.Call("RPUSH", ElementId, $"value{i}");
+            var storeMembers = new List<string> { "one", "two", "three" };
+            foreach (var member in storeMembers)
+            {
+                await Client.CallAsync("RPUSH", ElementId, member);
+            }
+
+            var listCount = Convert.ToInt32(await Client.CallAsync("LLEN", ElementId));
+            Assert.Equal(storeMembers.Count, listCount);
+
+            var members = new List<object>();
+            for (int index = 0; index < listCount; index++)
+            {
+                members.Add(await Client.CallAsync("LINDEX", ElementId, index.ToString()));
+            }
+
+            Assert.Equal(storeMembers, members);
         }
 
-        Client.Call("LTRIM", ElementId, "1", "3");
-
-        var listCount = Convert.ToInt32(Client.Call("LLEN", ElementId));
-        Assert.Equal(3, listCount);
-
-        var firstItem = Client.Call("LINDEX", ElementId, "0");
-        Assert.Equal("value1", firstItem);
-    }
-
-    [Fact]
-    public void Should_RemoveSpecificValue_When_UsingLRemCommand()
-    {
-        Client.Call("RPUSH", ElementId, "value");
-        Client.Call("RPUSH", ElementId, "value");
-        Client.Call("RPUSH", ElementId, "another");
-
-        Client.Call("LREM", ElementId, "0", "value");
-
-        var listCount = Convert.ToInt32(Client.Call("LLEN", ElementId));
-        Assert.Equal(1, listCount);
-
-        var remainingItem = Client.Call("LINDEX", ElementId, "0");
-        Assert.Equal("another", remainingItem);
-    }
-
-    [Fact]
-    public void Should_TransferLastItemAndReturnIt_When_UsingRPopLPushCommand()
-    {
-        string sourceList = GetId();
-        string destinationList = GetId();
-
-        Client.Call("RPUSH", sourceList, "item1");
-        Client.Call("RPUSH", sourceList, "item2");
-        Client.Call("RPUSH", sourceList, "item3");
-
-        var result = Client.Call("RPOPLPUSH", sourceList, destinationList);
-
-        Assert.Equal("item3", result);
-
-        var sourceListCount = Convert.ToInt32(Client.Call("LLEN", sourceList));
-        var destinationListCount = Convert.ToInt32(Client.Call("LLEN", destinationList));
-
-        Assert.Equal(2, sourceListCount);
-        Assert.Equal(1, destinationListCount);
-
-        var destinationListItem = Client.Call("LINDEX", destinationList, "0");
-        Assert.Equal("item3", destinationListItem);
-    }
-
-    [Fact]
-    public async Task Should_BlockTransferLastItemAndReturnIt_When_UsingBRPopLPushCommand()
-    {
-        string sourceList = GetId();
-        string destinationList = GetId();
-
-        var blockedCallTask = Task.Run(() =>
+        [Fact]
+        public async Task Should_ReturnListCount_When_ElementsAddedToList()
         {
-            var client2 = new Resp2Client("localhost", 6379);
-            return client2.Call("BRPOPLPUSH", sourceList, destinationList, "5");
-        });
+            await Client.CallAsync("RPUSH", ElementId, "one");
+            await Client.CallAsync("RPUSH", ElementId, "two");
 
-        await Task.Delay(1000);
+            var listCount = Convert.ToInt32(await Client.CallAsync("LLEN", ElementId));
+            Assert.Equal(2, listCount);
+        }
 
-        Client.Call("RPUSH", sourceList, "item2");
+        [Fact]
+        public async Task Should_AddElementsToList_When_RPushCommandIsUsed()
+        {
+            await Client.CallAsync("RPUSH", ElementId, "one");
+            await Client.CallAsync("RPUSH", ElementId, "two");
+            var result = (object[])await Client.CallAsync("LRANGE", ElementId, "0", "-1");
 
-        var result = await blockedCallTask;
+            Assert.True(Enumerable.SequenceEqual(new object[] { "one", "two" }, result));
+        }
 
-        Assert.Equal("item2", result);
+        [Fact]
+        public async Task Should_ReturnCorrectItem_When_GettingItemFromList()
+        {
+            await Client.CallAsync("RPUSH", ElementId, "one");
+            await Client.CallAsync("RPUSH", ElementId, "two");
+            await Client.CallAsync("RPUSH", ElementId, "three");
 
-        var sourceListCount = Convert.ToInt32(Client.Call("LLEN", sourceList));
-        var destinationListCount = Convert.ToInt32(Client.Call("LLEN", destinationList));
+            var item = await Client.CallAsync("LINDEX", ElementId, "1");
+            Assert.Equal("two", item);
+        }
 
-        Assert.Equal(0, sourceListCount);
-        Assert.Equal(1, destinationListCount);
+        [Fact]
+        public async Task Should_SetNewItem_When_UsingLSetCommand()
+        {
+            await Client.CallAsync("RPUSH", ElementId, "one");
+            await Client.CallAsync("RPUSH", ElementId, "two");
+            await Client.CallAsync("LSET", ElementId, "1", "new");
 
-        var destinationListItem = Client.Call("LINDEX", destinationList, "0");
-        Assert.Equal("item2", destinationListItem);
+            var item = await Client.CallAsync("LINDEX", ElementId, "1");
+            Assert.Equal("new", item);
+        }
+
+        [Fact]
+        public async Task Should_RemoveAndReturnFirstItem_When_UsingLPopCommand()
+        {
+            await Client.CallAsync("RPUSH", ElementId, "one");
+            await Client.CallAsync("RPUSH", ElementId, "two");
+            await Client.CallAsync("RPUSH", ElementId, "three");
+
+            var poppedItem = await Client.CallAsync("LPOP", ElementId);
+            Assert.Equal("one", poppedItem);
+
+            var listCount = Convert.ToInt32(await Client.CallAsync("LLEN", ElementId));
+            Assert.Equal(2, listCount);
+        }
+
+        [Fact]
+        public async Task Should_RemoveAndReturnLastItem_When_UsingRPopCommand()
+        {
+            await Client.CallAsync("RPUSH", ElementId, "one");
+            await Client.CallAsync("RPUSH", ElementId, "two");
+            await Client.CallAsync("RPUSH", ElementId, "three");
+
+            var poppedItem = await Client.CallAsync("RPOP", ElementId);
+            Assert.Equal("three", poppedItem);
+
+            var listCount = Convert.ToInt32(await Client.CallAsync("LLEN", ElementId));
+            Assert.Equal(2, listCount);
+        }
+
+        [Fact]
+        public async Task Should_AddItemToLeft_When_UsingLPushCommand()
+        {
+            await Client.CallAsync("LPUSH", ElementId, "one");
+            await Client.CallAsync("LPUSH", ElementId, "zero");
+
+            var firstItem = await Client.CallAsync("LINDEX", ElementId, "0");
+            Assert.Equal("zero", firstItem);
+        }
+
+        [Fact]
+        public async Task Should_TrimList_When_UsingLTrimCommand()
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                await Client.CallAsync("RPUSH", ElementId, $"value{i}");
+            }
+
+            await Client.CallAsync("LTRIM", ElementId, "1", "3");
+
+            var listCount = Convert.ToInt32(await Client.CallAsync("LLEN", ElementId));
+            Assert.Equal(3, listCount);
+
+            var firstItem = await Client.CallAsync("LINDEX", ElementId, "0");
+            Assert.Equal("value1", firstItem);
+        }
+
+        [Fact]
+        public async Task Should_RemoveSpecificValue_When_UsingLRemCommand()
+        {
+            await Client.CallAsync("RPUSH", ElementId, "value");
+            await Client.CallAsync("RPUSH", ElementId, "value");
+            await Client.CallAsync("RPUSH", ElementId, "another");
+
+            await Client.CallAsync("LREM", ElementId, "0", "value");
+
+            var listCount = Convert.ToInt32(await Client.CallAsync("LLEN", ElementId));
+            Assert.Equal(1, listCount);
+
+            var remainingItem = await Client.CallAsync("LINDEX", ElementId, "0");
+            Assert.Equal("another", remainingItem);
+        }
+
+        [Fact]
+        public async Task Should_TransferLastItemAndReturnIt_When_UsingRPopLPushCommand()
+        {
+            string sourceList = GetId();
+            string destinationList = GetId();
+
+            await Client.CallAsync("RPUSH", sourceList, "item1");
+            await Client.CallAsync("RPUSH", sourceList, "item2");
+            await Client.CallAsync("RPUSH", sourceList, "item3");
+
+            var result = await Client.CallAsync("RPOPLPUSH", sourceList, destinationList);
+
+            Assert.Equal("item3", result);
+
+            var sourceListCount = Convert.ToInt32(await Client.CallAsync("LLEN", sourceList));
+            var destinationListCount = Convert.ToInt32(await Client.CallAsync("LLEN", destinationList));
+
+            Assert.Equal(2, sourceListCount);
+            Assert.Equal(1, destinationListCount);
+
+            var destinationListItem = await Client.CallAsync("LINDEX", destinationList, "0");
+            Assert.Equal("item3", destinationListItem);
+        }
+
+        [Fact]
+        public async Task Should_BlockTransferLastItemAndReturnIt_When_UsingBRPopLPushCommand()
+        {
+            string sourceList = GetId();
+            string destinationList = GetId();
+
+            var blockedCallTask = Task.Run(async () =>
+            {
+                var client2 = new Resp2Client("localhost", 6379);
+                return await client2.CallAsync("BRPOPLPUSH", sourceList, destinationList, "5");
+            });
+
+            await Task.Delay(1000);
+
+            await Client.CallAsync("RPUSH", sourceList, "item2");
+
+            var result = await blockedCallTask;
+
+            Assert.Equal("item2", result);
+
+            var sourceListCount = Convert.ToInt32(await Client.CallAsync("LLEN", sourceList));
+            var destinationListCount = Convert.ToInt32(await Client.CallAsync("LLEN", destinationList));
+
+            Assert.Equal(0, sourceListCount);
+            Assert.Equal(1, destinationListCount);
+
+            var destinationListItem = await Client.CallAsync("LINDEX", destinationList, "0");
+            Assert.Equal("item2", destinationListItem);
+        }
     }
 }
-

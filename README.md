@@ -2,16 +2,34 @@
 
 ## Introduction
 
-RedSharpNano is a minimalistic Redis client for the RESP2 protocol, showcasing that a fully functional Redis client can be achieved in approximately 100 lines of C# code. It's designed to emphasize simplicity, not best practices or optimal implementations.
+RedSharpNano is a minimalistic Redis client for the RESP2 protocol, showcasing that a fully functional Redis client can be achieved in approximately 100 lines of C# code. It's designed to emphasize simplicity, not best practices or optimal implementations. The client has been refactored to support asynchronous operations, making it more efficient for modern applications.
 
 ## Features
 
 - **Lightweight**: With only about 100 lines of code, RedSharpNano is extremely lightweight and easy to understand.
 - **RESP2 Protocol Support**: It should be capable of supporting almost all RESP2 protocol functionalities.
 - **Pipeline Support**: Offers a simple pipeline mechanism to batch Redis commands for efficiency.
+- **Asynchronous Operations**: Refactored to support async/await, improving performance for I/O-bound operations.
 - **Versatile Command Input**: Offers two ways to input commands:
-  - Use the structured command format: `Call("cmd", "arg", "arg")`.
-  - Or use a single string command: `Call("CMD arg arg")`. This format allows setting keys and values with spaces by enclosing them in double quotes, e.g., `Call("SET \"my key\" \"some value\"")`.
+
+  - Use the structured command format:
+
+  ```csharp
+  await CallAsync("cmd", "arg", "arg")
+  ```
+
+  - Or use a single string command:
+
+  ```csharp
+  await CallAsync("CMD arg arg")
+  ```
+
+  This format allows setting keys and values with spaces by enclosing them in double quotes, e.g.,
+
+  ```csharp
+  await CallAsync("SET \"my key\" \"some value\"")
+  ```
+
 - **Simple and Easy-to-Use API**: The API is straightforward, making it easy to integrate into projects for learning or prototyping purposes.
 - **Open Source**: Distributed under the MIT License, free to use, modify, and distribute.
 
@@ -24,7 +42,7 @@ RedSharpNano can be integrated into your project in two ways:
 
 ## Usage
 
-To run the demo project or execute the tests, you need .Net 8 SDK installed and a local Redis server, you can use Docker to run a Redis instance.
+To run the demo project or execute the tests, you need .Net 8 SDK installed and a local Redis server or you can use Docker to run a Redis instance.
 
 - Pull the latest Redis image and runs it in a detached mode with the default Redis port (6379) mapped to your local machine.
 
@@ -40,10 +58,11 @@ git clone https://github.com/janek-lopez/RedSharpNano.git
 cd RedSharpNano
 ```
 
-- Run the demo project
+- Run the demo projects
 
 ```bash
-dotnet run --project .\src\RedSharpNano.Demo\
+dotnet run --project .\src\RedSharpNano.Demo.DistributedLock\
+dotnet run --project .\src\RedSharpNano.Demo.Leaderboard\
 ```
 
 - Run the tests
@@ -63,19 +82,19 @@ To use RedSharpNano, follow these steps:
 2. **Executing Commands**: Use the Call method to execute Redis commands.
 
    ```csharp
-   var result = client.Call("SET", "key", "value");
+   var result = await client.CallAsync("SET", "key", "value");
    ```
 
 3. **Using Pipelines**: Batch commands using the Pipeline method for efficient execution.
 
    ```csharp
-    var results = client.Pipeline(c =>
-    {
-        c.Call("SET", "batchkey1", "value1");
-        c.Call("SET", "batchkey2", "value2");
-        c.Call("GET", "batchkey1");
-        c.Call("GET", "batchkey2");
-    });
+   var results = await client.PipelineAsync(async c =>
+   {
+      await c.CallAsync("SET", "batchkey1", "value1");
+      await c.CallAsync("SET", "batchkey2", "value2");
+      await c.CallAsync("GET", "batchkey1");
+      await c.CallAsync("GET", "batchkey2");
+   });
 
     foreach (var result in results)
     {
@@ -87,7 +106,7 @@ To use RedSharpNano, follow these steps:
 
    ```csharp
     var client = new Resp2Client();
-    var value = client.Call("GET", "nonexistentkey");
+    var value = await client.CallAsync("GET", "nonexistentkey");
     Console.WriteLine(value ?? "Key does not exist");
    ```
 
