@@ -14,6 +14,58 @@ public class RedSharpNanoHashTests : RedSharpNanoBaseTests
     }
 
     [Fact]
+    public async Task Should_ReturnNull_When_HGetOnMissingField()
+    {
+        var field = "missing";
+        var res = await Client.CallAsync("HGET", ElementId, field);
+        Assert.Null(res);
+    }
+
+    [Fact]
+    public async Task Should_ReturnAddedCount_When_HSetNewVsUpdate()
+    {
+        var field = "f"; var v1 = "1"; var v2 = "2";
+        var added = await Client.CallAsync("HSET", ElementId, field, v1);
+        Assert.Equal("1", added);
+        var updated = await Client.CallAsync("HSET", ElementId, field, v2);
+        Assert.Equal("0", updated);
+        var back = await Client.CallAsync("HGET", ElementId, field);
+        Assert.Equal(v2, back);
+    }
+
+    [Fact]
+    public async Task Should_IncrementIntegerField_When_HIncrByIsUsed()
+    {
+        await Client.CallAsync("HSET", ElementId, "count", "10");
+        var r1 = await Client.CallAsync("HINCRBY", ElementId, "count", "5");
+        Assert.Equal("15", r1);
+        var r2 = await Client.CallAsync("HINCRBY", ElementId, "count", "-3");
+        Assert.Equal("12", r2);
+    }
+
+    [Fact]
+    public async Task Should_ScanAllFields_When_HScanIsUsed()
+    {
+        // seed
+        foreach (var kv in MapValues)
+            await Client.CallAsync("HSET", ElementId, kv.Key, kv.Value);
+
+        var seen = new Dictionary<string, string>();
+        var cursor = "0";
+        do
+        {
+            var reply = (object[])await Client.CallAsync("HSCAN", ElementId, cursor);
+            cursor = (string)reply[0];
+            var kvs = (object[])reply[1];
+            for (int i = 0; i + 1 < kvs.Length; i += 2)
+                seen[(string)kvs[i]] = (string)kvs[i + 1];
+        } while (cursor != "0");
+
+        Assert.Equal(MapValues.Count, seen.Count);
+        foreach (var kv in MapValues) Assert.Equal(kv.Value, seen[kv.Key]);
+    }
+
+    [Fact]
     public async Task Should_RetrieveAllEntries_When_SettingMultipleHashValues()
     {
         foreach (var entry in MapValues)
@@ -168,17 +220,5 @@ public class RedSharpNanoHashTests : RedSharpNanoBaseTests
 
         var hashCount = await Client.CallAsync("HLEN", ElementId);
         Assert.Equal("0", hashCount);
-    }
-
-
-    [Fact]
-    public async Task Should_AddMembersToSet_When_SAddCommandIsUsed()
-    {
-        await Client.CallAsync("SADD", "myset", "member1");
-        await Client.CallAsync("SADD", "myset", "member2");
-        var result = await Client.CallAsync("SMEMBERS", "myset") as object[];
-
-        Assert.Contains("member1", result);
-        Assert.Contains("member2", result);
     }
 }

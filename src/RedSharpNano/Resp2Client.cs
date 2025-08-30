@@ -1,93 +1,79 @@
 ﻿using System.Net.Sockets;
-using System.Text;
 using System.Text.RegularExpressions;
+using static System.Text.Encoding;
+using static System.Globalization.CultureInfo;
 
 namespace RedSharpNano;
 
-public class Resp2Client : IDisposable
+public sealed class Resp2Client(string host = "localhost", int port = 6379) : IDisposable
 {
-    private readonly TcpClient _tcp;
-    private readonly NetworkStream _stream;
-    private readonly StreamReader _reader;
-    private readonly List<string> _pipeline = new();
-    private bool _isPipelining;
+    const byte CR = (byte)'\r', LF = (byte)'\n';
+    const string CRLF = "\r\n";
 
-    public Resp2Client(string host = "localhost", int port = 6379)
+    readonly TcpClient _tcp = new(host, port) { NoDelay = true };
+    NetworkStream NetStream => _tcp.GetStream();
+    readonly List<string> _pipelineBuffer = [];
+    bool _isPipelining;
+
+    public async Task<object?> CallAsync(params string[] args)
     {
-        _tcp = new TcpClient(host, port);
-        _stream = _tcp.GetStream();
-        _reader = new StreamReader(_stream, Encoding.UTF8);
+        var command = $"*{args.Length}{CRLF}{string.Concat(args.Select(arg => $"${UTF8.GetByteCount(arg)}{CRLF}{arg}{CRLF}"))}";
+        if (_isPipelining) { _pipelineBuffer.Add(command); return null; }
+        await NetStream.WriteAsync(UTF8.GetBytes(command));
+        return await ParseAsync();
     }
 
-    public async Task<object> CallAsync(params string[] args)
+    public Task<object?> CallAsync(string commandLine) =>
+        CallAsync(Regex.Matches(commandLine, @"[^\s""]+|""([^""]*)""")
+                       .Select(match => match.Groups[1].Success ? match.Groups[1].Value : match.Value)
+                       .ToArray());
+
+    public async Task<List<object?>> PipelineAsync(Func<Resp2Client, Task> actions)
     {
-        var cmd = $"*{args.Length}\r\n{string.Join("", args.Select(a => $"${a.Length}\r\n{a}\r\n"))}";
-        if (_isPipelining) { _pipeline.Add(cmd); return null; }
-        await _stream.WriteAsync(Encoding.UTF8.GetBytes(cmd));
-        return await ParseResponseAsync();
+        _isPipelining = true; await actions(this); _isPipelining = false;
+        await NetStream.WriteAsync(UTF8.GetBytes(string.Concat(_pipelineBuffer)));
+        var responses = new List<object?>(_pipelineBuffer.Count);
+        for (int i = 0; i < _pipelineBuffer.Count; i++) responses.Add(await ParseAsync());
+        _pipelineBuffer.Clear(); return responses;
     }
 
-    public async Task<object> CallAsync(string arg)
+    async Task<object?> ParseAsync()
     {
-        var args = Regex
-            .Matches(arg, @"(?<match>\w+)|\""(?<match>[\w\s]*)""")
-            .Select(m => m.Groups["match"].Value)
-            .ToArray(); //https://stackoverflow.com/questions/554013/regular-expression-to-split-on-spaces-unless-in-quotes
-
-        return await CallAsync(args);
-    }
-
-    public async Task<List<object>> PipelineAsync(Func<Resp2Client, Task> actions)
-    {
-        _isPipelining = true;
-        await actions(this);
-        await _stream.WriteAsync(Encoding.UTF8.GetBytes(string.Join("", _pipeline)));
-        var responses = new List<object>();
-        foreach (var _ in _pipeline)
+        var line = await ReadLineAsync();
+        if (line.Length == 0) throw new Exception("Empty response");
+        var type = line[0]; var payload = line.Length > 1 ? line[1..] : "";
+        switch (type)
         {
-            responses.Add(await ParseResponseAsync());
+            case '-': throw new Exception(payload);
+            case '+' or ':': return payload; // integer & simple string replies as strings (matches tests)
+            case '$':
+                var length = int.Parse(payload, InvariantCulture);
+                if (length == -1) return null;
+                var buffer = new byte[length + 2]; await NetStream.ReadExactlyAsync(buffer);
+                if (buffer[^2] != CR || buffer[^1] != LF) throw new FormatException("Missing CRLF");
+                return UTF8.GetString(buffer, 0, length);
+            case '*':
+                var count = int.Parse(payload, InvariantCulture);
+                if (count == -1) return null;
+                var items = new object?[count];
+                for (int i = 0; i < count; i++) items[i] = await ParseAsync();
+                return items;
+            default: throw new NotSupportedException("Unknown RESP: " + type);
         }
-        _pipeline.Clear();
-        _isPipelining = false;
-        return responses;
     }
 
-    private async Task<object> ParseResponseAsync()
+    async Task<string> ReadLineAsync()
     {
-        var line = await _reader.ReadLineAsync();
-        if (string.IsNullOrEmpty(line)) throw new Exception("Empty response");
-        return line[0] switch
+        using var lineBuffer = new MemoryStream();
+        var oneByte = new byte[1];
+        while (true)
         {
-            '-' => throw new Exception(line[1..]),
-            '$' => await ReadBulkString(int.Parse(line[1..])),
-            '*' => await ReadArray(int.Parse(line[1..])),
-            _ => line[1..]
-        };
-    }
-
-    private async Task<string> ReadBulkString(int length)
-    {
-        if (length == -1) return null;
-        var buffer = new char[length];
-        await _reader.ReadBlockAsync(buffer, 0, length);
-        await _reader.ReadLineAsync(); // Consume CRLF
-        return new string(buffer);
-    }
-
-    private async Task<object[]> ReadArray(int length)
-    {
-        var result = new object[length];
-        for (int i = 0; i < length; i++)
-        {
-            result[i] = await ParseResponseAsync();
+            if (await NetStream.ReadAsync(oneByte, 0, 1) == 0) throw new EndOfStreamException();
+            if (oneByte[0] == LF) break;
+            if (oneByte[0] != CR) lineBuffer.WriteByte(oneByte[0]);
         }
-        return result;
+        return UTF8.GetString(lineBuffer.ToArray());
     }
 
-    public void Dispose()
-    {
-        _tcp?.Dispose();
-        _stream?.Dispose();
-        _reader?.Dispose();
-    }
+    public void Dispose() => _tcp.Dispose();
 }

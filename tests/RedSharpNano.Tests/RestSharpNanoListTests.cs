@@ -5,6 +5,51 @@ namespace RedSharpNano.Tests
     [Collection("Redis collection")]
     public class RedSharpNanoListTests : RedSharpNanoBaseTests
     {
+
+        [Fact]
+        public async Task Should_ReturnEmptyArray_When_LRangeOnMissingList()
+        {
+            var res = (object[])await Client.CallAsync("LRANGE", GetId(), "0", "-1");
+            Assert.Empty(res);
+        }
+
+        [Fact]
+        public async Task Should_ReturnNull_When_LIndexOutOfRange()
+        {
+            await Client.CallAsync("RPUSH", ElementId, "one");
+            var res = await Client.CallAsync("LINDEX", ElementId, "5");
+            Assert.Null(res);
+        }
+
+        [Fact]
+        public async Task Should_ReturnLast_When_LIndexNegative()
+        {
+            await Client.CallAsync("RPUSH", ElementId, "one");
+            await Client.CallAsync("RPUSH", ElementId, "two");
+            await Client.CallAsync("RPUSH", ElementId, "three");
+            var res = await Client.CallAsync("LINDEX", ElementId, "-1");
+            Assert.Equal("three", res);
+        }
+
+        [Fact]
+        public async Task Should_ReturnNull_When_BLPopTimesOut()
+        {
+            var list = GetId();
+            var res = await Client.CallAsync("BLPOP", list, "1"); // timeout 1s, empty list
+            Assert.Null(res); // Null multi-bulk -> client maps to null
+        }
+
+        [Fact]
+        public async Task Should_InsertRelativeToPivot_When_LInsertUsed()
+        {
+            await Client.CallAsync("RPUSH", ElementId, "a");
+            await Client.CallAsync("RPUSH", ElementId, "c");
+            var count = await Client.CallAsync("LINSERT", ElementId, "BEFORE", "c", "b");
+            Assert.Equal("3", count);
+            var all = (object[])await Client.CallAsync("LRANGE", ElementId, "0", "-1");
+            Assert.True(Enumerable.SequenceEqual(new object[] { "a", "b", "c" }, all));
+        }
+
         [Fact]
         public async Task Should_AddToListAndRetrieveAll_When_ListOperationsPerformed()
         {
