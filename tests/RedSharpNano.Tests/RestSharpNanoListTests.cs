@@ -9,7 +9,7 @@ namespace RedSharpNano.Tests
         [Fact]
         public async Task Should_ReturnEmptyArray_When_LRangeOnMissingList()
         {
-            var res = (object[])await Client.CallAsync("LRANGE", GetId(), "0", "-1");
+            var res = Assert.IsType<object[]>(await Client.CallAsync("LRANGE", GetId(), "0", "-1"));
             Assert.Empty(res);
         }
 
@@ -46,7 +46,7 @@ namespace RedSharpNano.Tests
             await Client.CallAsync("RPUSH", ElementId, "c");
             var count = await Client.CallAsync("LINSERT", ElementId, "BEFORE", "c", "b");
             Assert.Equal("3", count);
-            var all = (object[])await Client.CallAsync("LRANGE", ElementId, "0", "-1");
+            var all = Assert.IsType<object[]>(await Client.CallAsync("LRANGE", ElementId, "0", "-1"));
             Assert.True(Enumerable.SequenceEqual(new object[] { "a", "b", "c" }, all));
         }
 
@@ -65,7 +65,9 @@ namespace RedSharpNano.Tests
             var members = new List<object>();
             for (int index = 0; index < listCount; index++)
             {
-                members.Add(await Client.CallAsync("LINDEX", ElementId, index.ToString()));
+                var item = await Client.CallAsync("LINDEX", ElementId, index.ToString());
+                Assert.NotNull(item);
+                members.Add(item);
             }
 
             Assert.Equal(storeMembers, members);
@@ -86,7 +88,7 @@ namespace RedSharpNano.Tests
         {
             await Client.CallAsync("RPUSH", ElementId, "one");
             await Client.CallAsync("RPUSH", ElementId, "two");
-            var result = (object[])await Client.CallAsync("LRANGE", ElementId, "0", "-1");
+            var result = Assert.IsType<object[]>(await Client.CallAsync("LRANGE", ElementId, "0", "-1"));
 
             Assert.True(Enumerable.SequenceEqual(new object[] { "one", "two" }, result));
         }

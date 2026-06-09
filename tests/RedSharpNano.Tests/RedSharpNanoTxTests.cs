@@ -12,7 +12,7 @@ namespace RedSharpNano.Tests
             Assert.Equal("OK", await Client.CallAsync("MULTI"));
             Assert.Equal("QUEUED", await Client.CallAsync("SET", k, "x"));
             Assert.Equal("QUEUED", await Client.CallAsync("GET", k));
-            var exec = (object[])await Client.CallAsync("EXEC");
+            var exec = Assert.IsType<object[]>(await Client.CallAsync("EXEC"));
             Assert.Equal("OK", exec[0]);
             Assert.Equal("x", exec[1]);
         }

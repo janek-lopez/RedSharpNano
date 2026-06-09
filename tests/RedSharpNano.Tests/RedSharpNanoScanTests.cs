@@ -16,7 +16,7 @@ namespace RedSharpNano.Tests
             var cursor = "0";
             do
             {
-                var resp = (object[])await Client.CallAsync("SCAN", cursor, "MATCH", prefix + "*", "COUNT", "100");
+                var resp = Assert.IsType<object[]>(await Client.CallAsync("SCAN", cursor, "MATCH", prefix + "*", "COUNT", "100"));
                 cursor = (string)resp[0];
                 var batch = (object[])resp[1];
                 foreach (var o in batch) found.Add((string)o);
@@ -32,7 +32,7 @@ namespace RedSharpNano.Tests
             var cursor = "0"; bool seenAny = false;
             do
             {
-                var resp = (object[])await Client.CallAsync("SCAN", cursor, "COUNT", "5");
+                var resp = Assert.IsType<object[]>(await Client.CallAsync("SCAN", cursor, "COUNT", "5"));
                 cursor = (string)resp[0];
                 var batch = (object[])resp[1];
                 seenAny |= batch.Length > 0;

@@ -2,11 +2,11 @@
 
 ## Introduction
 
-RedSharpNano is a minimalistic Redis client for the RESP2 protocol, showcasing that a fully functional Redis client can be achieved in approximately 100 lines of C# code. It's designed to emphasize simplicity, not best practices or optimal implementations. The client has been refactored to support asynchronous operations, making it more efficient for modern applications.
+RedSharpNano is a minimalistic Redis client for the RESP2 protocol, showcasing that a fully functional Redis client can be achieved in approximately 55 lines of C# code. It's designed to emphasize simplicity, not best practices or optimal implementations. The client has been refactored to support asynchronous operations, making it more efficient for modern applications.
 
 ## Features
 
-- **Lightweight**: With only about 100 lines of code, RedSharpNano is extremely lightweight and easy to understand.
+- **Lightweight**: With only about 55 lines of code, RedSharpNano is extremely lightweight and easy to understand.
 - **RESP2 Protocol Support**: It should be capable of supporting almost all RESP2 protocol functionalities.
 - **Pipeline Support**: Offers a simple pipeline mechanism to batch Redis commands for efficiency.
 - **Asynchronous Operations**: Refactored to support async/await, improving performance for I/O-bound operations.
@@ -42,7 +42,7 @@ RedSharpNano can be integrated into your project in two ways:
 
 ## Usage
 
-To run the demo project or execute the tests, you need .Net 8 SDK installed and a local Redis server or you can use Docker to run a Redis instance.
+To run the demo project or execute the tests, you need .Net 10 SDK installed and a local Redis server or you can use Docker to run a Redis instance.
 
 - Pull the latest Redis image and runs it in a detached mode with the default Redis port (6379) mapped to your local machine.
 

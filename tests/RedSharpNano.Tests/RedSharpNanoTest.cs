@@ -33,7 +33,7 @@ namespace RedSharpNano.Tests
         {
             var k1 = GetId(); var k2 = GetId();
             await Client.CallAsync("SET", k1, "v1");
-            var res = (object[])await Client.CallAsync("MGET", k1, k2);
+            var res = Assert.IsType<object[]>(await Client.CallAsync("MGET", k1, k2));
             Assert.Equal(2, res.Length);
             Assert.Equal("v1", res[0]);
             Assert.Null(res[1]);
@@ -52,7 +52,7 @@ namespace RedSharpNano.Tests
         [Fact]
         public async Task Should_ReturnTwoNumbers_When_TimeCommandIsCalled()
         {
-            var arr = (object[])await Client.CallAsync("TIME");
+            var arr = Assert.IsType<object[]>(await Client.CallAsync("TIME"));
             Assert.Equal(2, arr.Length);
             Assert.True(long.TryParse((string)arr[0], out _));
             Assert.True(long.TryParse((string)arr[1], out _));
@@ -140,7 +140,8 @@ namespace RedSharpNano.Tests
             Assert.Equal("1", setExpiry);
 
             var ttlAfter = await Client.CallAsync("TTL", k); // >=1
-            Assert.True(int.Parse((string)ttlAfter) >= 1);
+            var ttl = Assert.IsAssignableFrom<string>(ttlAfter);
+            Assert.True(int.Parse(ttl) >= 1);
         }
 
         [Fact]

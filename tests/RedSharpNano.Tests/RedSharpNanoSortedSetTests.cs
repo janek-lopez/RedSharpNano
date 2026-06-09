@@ -15,7 +15,7 @@ namespace RedSharpNano.Tests
             var card = await Client.CallAsync("ZCARD", z);
             Assert.Equal("2", card);
 
-            var withScores = (object[])await Client.CallAsync("ZRANGE", z, "0", "-1", "WITHSCORES");
+            var withScores = Assert.IsType<object[]>(await Client.CallAsync("ZRANGE", z, "0", "-1", "WITHSCORES"));
             Assert.Equal(4, withScores.Length);
             Assert.Equal("a", withScores[0]); Assert.Equal("1", withScores[1]);
             Assert.Equal("b", withScores[2]); Assert.Equal("2", withScores[3]);
@@ -39,8 +39,8 @@ namespace RedSharpNano.Tests
             var newScore = await Client.CallAsync("ZINCRBY", z, "2.5", "a");
             Assert.Equal("3.5", newScore);
 
-            var byScore = (object[])await Client.CallAsync("ZRANGEBYSCORE", z, "3", "+inf");
-            Assert.True(byScore.Cast<string>().Contains("a"));
+            var byScore = Assert.IsType<object[]>(await Client.CallAsync("ZRANGEBYSCORE", z, "3", "+inf"));
+            Assert.Contains("a", byScore.Cast<string>());
         }
 
         [Fact]
@@ -62,7 +62,7 @@ namespace RedSharpNano.Tests
             var seen = new HashSet<string>(); var cursor = "0";
             do
             {
-                var resp = (object[])await Client.CallAsync("ZSCAN", z, cursor, "COUNT", "2");
+                var resp = Assert.IsType<object[]>(await Client.CallAsync("ZSCAN", z, cursor, "COUNT", "2"));
                 cursor = (string)resp[0];
                 var kvs = (object[])resp[1];
                 for (int i = 0; i + 1 < kvs.Length; i += 2)

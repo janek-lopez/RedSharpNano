@@ -31,7 +31,7 @@ namespace RedSharpNano.Tests
         {
             await Client.CallAsync("SADD", "myset", "member1");
             await Client.CallAsync("SADD", "myset", "member2");
-            var result = await Client.CallAsync("SMEMBERS", "myset") as object[];
+            var result = Assert.IsType<object[]>(await Client.CallAsync("SMEMBERS", "myset"));
 
             Assert.Contains("member1", result);
             Assert.Contains("member2", result);
@@ -46,13 +46,13 @@ namespace RedSharpNano.Tests
             await Client.CallAsync("SADD", b, "2");
             await Client.CallAsync("SADD", b, "3");
 
-            var sunion = ((object[])await Client.CallAsync("SUNION", a, b)).Cast<string>().ToHashSet();
+            var sunion = Assert.IsType<object[]>(await Client.CallAsync("SUNION", a, b)).Cast<string>().ToHashSet();
             Assert.True(new[] { "1", "2", "3" }.All(sunion.Contains));
 
-            var sinter = ((object[])await Client.CallAsync("SINTER", a, b)).Cast<string>().ToArray();
+            var sinter = Assert.IsType<object[]>(await Client.CallAsync("SINTER", a, b)).Cast<string>().ToArray();
             Assert.Single(sinter); Assert.Equal("2", sinter[0]);
 
-            var sdiff = ((object[])await Client.CallAsync("SDIFF", a, b)).Cast<string>().ToArray();
+            var sdiff = Assert.IsType<object[]>(await Client.CallAsync("SDIFF", a, b)).Cast<string>().ToArray();
             Assert.Single(sdiff); Assert.Equal("1", sdiff[0]);
         }
 
@@ -66,7 +66,7 @@ namespace RedSharpNano.Tests
             var seen = new HashSet<string>(); var cursor = "0";
             do
             {
-                var resp = (object[])await Client.CallAsync("SSCAN", set, cursor, "COUNT", "2");
+                var resp = Assert.IsType<object[]>(await Client.CallAsync("SSCAN", set, cursor, "COUNT", "2"));
                 cursor = (string)resp[0];
                 foreach (var m in (object[])resp[1]) seen.Add((string)m);
             } while (cursor != "0");

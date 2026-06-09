@@ -54,7 +54,7 @@ public class RedSharpNanoHashTests : RedSharpNanoBaseTests
         var cursor = "0";
         do
         {
-            var reply = (object[])await Client.CallAsync("HSCAN", ElementId, cursor);
+            var reply = Assert.IsType<object[]>(await Client.CallAsync("HSCAN", ElementId, cursor));
             cursor = (string)reply[0];
             var kvs = (object[])reply[1];
             for (int i = 0; i + 1 < kvs.Length; i += 2)
@@ -73,7 +73,7 @@ public class RedSharpNanoHashTests : RedSharpNanoBaseTests
             await Client.CallAsync("HSET", ElementId, entry.Key, entry.Value);
         }
 
-        var members = await Client.CallAsync("HGETALL", ElementId) as object[];
+        var members = Assert.IsType<object[]>(await Client.CallAsync("HGETALL", ElementId));
 
         Assert.True(AreHashesEqual(MapValues, members));
     }
@@ -91,7 +91,7 @@ public class RedSharpNanoHashTests : RedSharpNanoBaseTests
 
         MapValues.Remove(firstKey);
 
-        var members = await Client.CallAsync("HGETALL", ElementId) as object[];
+        var members = Assert.IsType<object[]>(await Client.CallAsync("HGETALL", ElementId));
         Assert.True(AreHashesEqual(MapValues, members));
     }
 
@@ -149,7 +149,7 @@ public class RedSharpNanoHashTests : RedSharpNanoBaseTests
         }
 
         var expectedKeys = MapValues.Keys.ToList();
-        var hashKeys = await Client.CallAsync("HKEYS", ElementId) as object[];
+        var hashKeys = Assert.IsType<object[]>(await Client.CallAsync("HKEYS", ElementId));
 
         Assert.True(Enumerable.SequenceEqual(expectedKeys, hashKeys));
     }
@@ -163,7 +163,7 @@ public class RedSharpNanoHashTests : RedSharpNanoBaseTests
         }
 
         var expectedValues = MapValues.Values.ToList();
-        var hashValues = await Client.CallAsync("HVALS", ElementId) as object[];
+        var hashValues = Assert.IsType<object[]>(await Client.CallAsync("HVALS", ElementId));
 
         Assert.True(Enumerable.SequenceEqual(expectedValues, hashValues));
     }
@@ -183,7 +183,7 @@ public class RedSharpNanoHashTests : RedSharpNanoBaseTests
 
         MapValues[newKey] = newValue;
 
-        var updatedItems = await Client.CallAsync("HGETALL", ElementId) as object[];
+        var updatedItems = Assert.IsType<object[]>(await Client.CallAsync("HGETALL", ElementId));
         Assert.True(AreHashesEqual(MapValues, updatedItems));
     }
 

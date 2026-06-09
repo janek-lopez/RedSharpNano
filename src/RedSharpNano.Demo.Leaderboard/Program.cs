@@ -31,15 +31,16 @@ class Program
             await c.CallAsync("ZCARD", "leaderboard");
         });
 
-        var rank = results[0] != null ? int.Parse(results[0].ToString()) : -1;
-        var totalPlayers = results[1] != null ? int.Parse(results[1].ToString()) : 0;
+        var rank = results[0] is string r0 ? int.Parse(r0) : -1;
+        var totalPlayers = results[1] is string r1 ? int.Parse(r1) : 0;
 
         Console.WriteLine($"{playerName} finished at rank {rank + 1} out of {totalPlayers}.");
     }
 
     static async Task DisplayTopPlayers(Resp2Client client)
     {
-        var topScores = await client.CallAsync("ZREVRANGE", "leaderboard", "0", "2", "WITHSCORES") as object[];
+        var topScores = await client.CallAsync("ZREVRANGE", "leaderboard", "0", "2", "WITHSCORES") as object[]
+            ?? throw new InvalidOperationException("Expected array from ZREVRANGE");
         Console.WriteLine("\nTop 3 Players:");
         for (int i = 0; i < topScores.Length; i += 2)
         {
